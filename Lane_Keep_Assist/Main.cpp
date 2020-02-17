@@ -27,7 +27,7 @@ void test_sample_images() {
         cv::Mat image = cv::imread(image_string);
 
         // Undistort the image
-        cv::Mat undistorted_image = detector.undistort_image(image);
+        cv::Mat resultant_image = detector.find_lanes(image, image_string);
 
         // Get filename
         fs::path pathObj(image_path);
@@ -35,11 +35,11 @@ void test_sample_images() {
         std::string output_path = TEST_IMAGES_OUTPUT_DIRECTORY + file_name;
         
         // Write the resultant image
-        cv::imwrite(output_path, undistorted_image);
+        cv::imwrite(output_path, resultant_image);
 
         // Display image
-        //cv::imshow(image_string, image);
-        //cv::waitKey(500);
+        //cv::imshow(image_string, resultant_image);
+        //cv::waitKey();
     }
 
 }
