@@ -1,6 +1,7 @@
 #include<opencv2/opencv.hpp>
 #include<iostream>
 #include<filesystem>
+#include<chrono>
 #include "LaneDetector.cpp"
 
 // ENVIORNMENT VARIABLES
@@ -27,7 +28,12 @@ void test_sample_images() {
         cv::Mat image = cv::imread(image_string);
 
         // Undistort the image
-        cv::Mat resultant_image = detector.find_lanes(image, image_string);
+        cv::setUseOptimized(true);
+        auto start = std::chrono::high_resolution_clock::now();
+        cv::Mat* resultant_image = detector.find_lanes(image, image_string);
+        auto stop = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+        std::cout << duration.count() << std::endl;
 
         // Get filename
         fs::path pathObj(image_path);
@@ -35,7 +41,7 @@ void test_sample_images() {
         std::string output_path = TEST_IMAGES_OUTPUT_DIRECTORY + file_name;
         
         // Write the resultant image
-        cv::imwrite(output_path, resultant_image);
+        cv::imwrite(output_path, *resultant_image);
 
         // Display image
         //cv::imshow(image_string, resultant_image);

@@ -1,14 +1,18 @@
 #include<opencv2/opencv.hpp>
 #include<iostream>
 #include<filesystem>
+#include"Lane.cpp"
 
-// Includes
+// Namespaces
 namespace fs = std::filesystem;
 
 // Lane Detector Class
 
 class LaneDetector {
 private:
+	Lane left_lane;
+	Lane right_lane;
+
 	cv::Mat calibration_matrix;
 	cv::Mat distance_coefficients;
 	cv::Mat transform_matrix;
@@ -25,7 +29,7 @@ private:
 	const int COLOUR_THRES_MIN = 180;
 	const int COLOUR_THRES_MAX = 255;
 	const int OFFSET = 100;
-
+	
 	void calibrate_camera(std::string &camera_calibration_images, cv::Size &chessboard_size, bool debug = false) {
 
 		// Initialize arrays to hold points
@@ -66,7 +70,7 @@ private:
 				object_points.push_back(obj);
 
 				// Tracking output
-				std::cout << "Calibrating with image: " + image_string << std::endl;
+				//std::cout << "Calibrating with image: " + image_string << std::endl;
 
 				if (debug) {
 					cv::drawChessboardCorners(image, chessboard_size, corners, corners_found);
@@ -78,7 +82,7 @@ private:
 			}
 			else {
 				// Tracking output
-				std::cout << "Skipped calibrating with image: " + image_string << std::endl;
+				//std::cout << "Skipped calibrating with image: " + image_string << std::endl;
 			}
 		}
 
@@ -95,19 +99,19 @@ private:
 		calibrated = true;
 	}
 
-	cv::Mat undistort_image(cv::Mat &image, std::string &image_path) {
-		cv::Mat undistorted_image;
+	cv::Mat* undistort_image(cv::Mat &image, std::string &image_path) {
+		cv::Mat* undistorted_image = new cv::Mat();;
 		if (calibrated) {
-			cv::undistort(image, undistorted_image, calibration_matrix, distance_coefficients);
+			cv::undistort(image, *undistorted_image, calibration_matrix, distance_coefficients);
 			// Tracking output
-			std::cout << "Undistoted image: " + image_path << std::endl;
+			//std::cout << "Undistoted image: " + image_path << std::endl;
 		}
 		return undistorted_image;
 	}
 
-	cv::Mat threshold_image(cv::Mat &image, std::string &image_path) {
+	cv::Mat* threshold_image(cv::Mat &image, std::string &image_path) {
 		// Create an output image
-		cv::Mat thresholded_image;
+		cv::Mat* thresholded_image = new cv::Mat();;
 
 		// Convert to HLS colour space
 		cv::Mat hls_image;
@@ -142,10 +146,10 @@ private:
 		cv::inRange(s_channel, COLOUR_THRES_MIN, COLOUR_THRES_MAX, thresholded_schannel);
 
 		// Combine both channels
-		cv::bitwise_or(thresholded_sobelx, thresholded_schannel, thresholded_image);
+		cv::bitwise_or(thresholded_sobelx, thresholded_schannel, *thresholded_image);
 
 		// Tracking output
-		std::cout << "Scaled and Thresholded image: " + image_path << std::endl;
+		//std::cout << "Scaled and Thresholded image: " + image_path << std::endl;
 
 		return thresholded_image;
 	}
@@ -165,42 +169,86 @@ private:
 		transform_calculated = true;
 
 		// Tracking output
-		std::cout << "Calculated perspective transform using: " + image_path << std::endl;
+		//std::cout << "Calculated perspective transform using: " + image_path << std::endl;
 	}
 
-	cv::Mat perspective_transform(cv::Mat &image, std::string &image_path) {
+	cv::Mat* perspective_transform(cv::Mat &image, std::string &image_path) {
 		// Transform the image using the calculated matrix
-		cv::Mat transformed_image;
-		cv::warpPerspective(image, transformed_image, transform_matrix, image.size());
+		cv::Mat* transformed_image = new cv::Mat();;
+		cv::warpPerspective(image, *transformed_image, transform_matrix, image.size());
 
 		// Tracking output
-		std::cout << "Transformed image: " + image_path << std::endl;
+		//std::cout << "Transformed image: " + image_path << std::endl;
 
 		return transformed_image;
 	}
 
-	cv::Mat detect_lanes(cv::Mat &image, std::string &image_path) {
+	cv::Mat* inv_perspective_transform(cv::Mat& image, std::string& image_path) {
+		// Transform the image using the calculated matrix
+		cv::Mat* inv_transformed_image = new cv::Mat();
+		cv::warpPerspective(image, *inv_transformed_image, inv_transform_matrix, image.size());
+
+		// Tracking output
+		//std::cout << "Inverse Transformed image: " + image_path << std::endl;
+
+		return inv_transformed_image;
+	}
+
+	cv::Mat* detect_lanes(cv::Mat &original_image, cv::Mat &image, std::string &image_path) {
 		// Prepare output
-		cv::Mat detected_lanes;
+		cv::Mat* detected_lanes = new cv::Mat();;
 
 		// Fine all nonzero pixels
-		cv::Mat nonzero;
+		std::vector<cv::Point> nonzero;
 		cv::findNonZero(image, nonzero);
 
-		// Create a histogram
-		int bins = 1;
-		int histSize[] = { 1 };
-		// Set ranges for histogram bins
-		float lranges[] = { 0, 1 };
-		const float* ranges[] = { lranges };
-		// create matrix for histogram
-		cv::Mat hist;
-		int channels[] = { 0 };
+		// Get the bottom half of the image
+		cv::Mat bot_half = image(cv::Rect(0, image.rows / 2, image.cols, image.rows / 2));
 
-		cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, histSize, ranges);
+		// Get left and right halves of bottom half of image
+		cv::Mat left_half = bot_half(cv::Rect(0, 0, bot_half.cols / 2, bot_half.rows));
+		cv::Mat right_half = bot_half(cv::Rect(bot_half.cols / 2, 0, bot_half.cols / 2, bot_half.rows));
 
+		// Get "histogram" of each side
+		cv::Mat left_hist;
+		cv::Mat right_hist;
+		cv::reduce(left_half, left_hist, 0, cv::REDUCE_SUM, CV_32F);
+		cv::reduce(right_half, right_hist, 0, cv::REDUCE_SUM, CV_32F);
+		
+		// Extract max values from histogram halves
+		cv::Point left_base;
+		cv::Point right_base;
 
-		return hist;
+		cv::minMaxLoc(left_hist, 0, 0, 0, &left_base);
+		cv::minMaxLoc(right_hist, 0, 0, 0, &right_base);
+
+		// Sliding window for each side of image
+		cv::Point left_current = left_base;
+		cv::Point right_current = right_base;
+
+		// Sliding window and polynomial fit
+		std::vector<double> left_fit = left_lane.find_lane(image, nonzero, left_current);
+		std::vector<double> right_fit = right_lane.find_lane(image, nonzero, right_current);
+
+		// Create points for fillpoly
+		std::vector<cv::Point> l_points;
+		std::vector<cv::Point> r_points;
+
+		for (int i = 0; i < image.size().height; ++i) {
+			int left_x = int(left_fit[0] + left_fit[1] * i + pow(left_fit[2] * i, 2));
+			int right_x = int(right_fit[0] + right_fit[1] * i + pow(right_fit[2] * i, 2));
+			l_points.push_back(cv::Point(left_x, i));
+			r_points.push_back(cv::Point(right_x, i));
+		}
+		l_points.insert(l_points.end(), r_points.begin(), r_points.end());
+		std::vector<std::vector<cv::Point>> points = { l_points };
+
+		// Draw lanes on image
+		cv::fillPoly(original_image, points, cv::Scalar(255, 255, 255));
+
+		//std::cout << "Detected Lanes: " + image_path << std::endl;
+
+		return &original_image;
 	}
 
 public:
@@ -217,13 +265,13 @@ public:
 		calibrate_camera(camera_calibration_images, chessboard_size, debug);
 	}
 
-	cv::Mat find_lanes(cv::Mat &image, std::string &image_path) {
+	cv::Mat* find_lanes(cv::Mat &image, std::string &image_path) {
 
 		// Output image
-		cv::Mat resultant_image;
+		cv::Mat* resultant_image;
 
 		// Undistort image
-		cv::Mat undistorted_image = undistort_image(image, image_path);
+		cv::Mat* undistorted_image = undistort_image(image, image_path);
 
 		if (!transform_calculated) {
 			// Calculate perspective transform
@@ -231,13 +279,16 @@ public:
 		}
 
 		// Colour and gradient threshold
-		cv::Mat thresholded_image = threshold_image(undistorted_image, image_path);
+		cv::Mat* thresholded_image = threshold_image(*undistorted_image, image_path);
 
 		// Get perspective transform
-		cv::Mat transformed_image = perspective_transform(thresholded_image, image_path);
+		cv::Mat* transformed_image = perspective_transform(*thresholded_image, image_path);
 
 		// Find lanes
-		resultant_image = detect_lanes(transformed_image, image_path);
+		cv::Mat* lane_image = detect_lanes(image, *transformed_image, image_path);
+
+		// Inverse perspective transform
+		resultant_image = inv_perspective_transform(*lane_image, image_path);
 
 		return resultant_image;
 	}
