@@ -14,14 +14,17 @@ private:
 	cv::Mat transform_matrix;
 	cv::Mat inv_transform_matrix;
 
+	const cv::Point2f src_points[4] = { cv::Point2f(150, 700), cv::Point2f(450, 500),
+		cv::Point2f(850, 500), cv::Point2f(1200, 700) };
+
 	bool transform_calculated;
 	bool calibrated;
 
-	int GRADIENT_THRES_MIN = 30;
-	int GRADIENT_THRES_MAX = 100;
-	int COLOUR_THRES_MIN = 180;
-	int COLOUR_THRES_MAX = 255;
-	int OFFSET = 100;
+	const int GRADIENT_THRES_MIN = 30;
+	const int GRADIENT_THRES_MAX = 100;
+	const int COLOUR_THRES_MIN = 180;
+	const int COLOUR_THRES_MAX = 255;
+	const int OFFSET = 100;
 
 	void calibrate_camera(std::string &camera_calibration_images, cv::Size &chessboard_size, bool debug = false) {
 
@@ -97,7 +100,7 @@ private:
 		if (calibrated) {
 			cv::undistort(image, undistorted_image, calibration_matrix, distance_coefficients);
 			// Tracking output
-			std::cout << "Undistoted image" + image_path << std::endl;
+			std::cout << "Undistoted image: " + image_path << std::endl;
 		}
 		return undistorted_image;
 	}
@@ -142,7 +145,7 @@ private:
 		cv::bitwise_or(thresholded_sobelx, thresholded_schannel, thresholded_image);
 
 		// Tracking output
-		std::cout << "Scaled and Thresholded image" + image_path << std::endl;
+		std::cout << "Scaled and Thresholded image: " + image_path << std::endl;
 
 		return thresholded_image;
 	}
@@ -151,33 +154,53 @@ private:
 		// Set source and destination points
 		cv::Size img_size = image.size();
 
+		// get dst points
+		cv::Point2f dst_points[4] = { cv::Point2f(OFFSET, img_size.height - OFFSET), cv::Point2f(OFFSET, OFFSET),
+			cv::Point2f(img_size.width - OFFSET, OFFSET), cv::Point2f(img_size.width - OFFSET, img_size.height - OFFSET) };
+
 
 		// Calculate perspective transform matrix
-		transform_matrix = cv::getPerspectiveTransform();
-		inv_transform_matrix = cv::getPerspectiveTransform();
+		transform_matrix = cv::getPerspectiveTransform(src_points, dst_points);
+		inv_transform_matrix = cv::getPerspectiveTransform(dst_points, src_points);
+		transform_calculated = true;
 
-		/*
-		src = np.float32(SRC_POINTS)
-		dst = np.float32([[OFFSET, img_size[1] - OFFSET], [OFFSET, OFFSET], [img_size[0] - OFFSET, OFFSET], [img_size[0] - OFFSET, img_size[1] - OFFSET]] )
-
-		// Calculate perspective transform matrix
-		transform_matrix = cv::getPerspectiveTransform(src, dst);
-		inv_transform_matrix = cv2.getPerspectiveTransform(dst, src)
-		*/
-
-
+		// Tracking output
+		std::cout << "Calculated perspective transform using: " + image_path << std::endl;
 	}
 
 	cv::Mat perspective_transform(cv::Mat &image, std::string &image_path) {
-		cv::Mat transformed_image = image;
+		// Transform the image using the calculated matrix
+		cv::Mat transformed_image;
+		cv::warpPerspective(image, transformed_image, transform_matrix, image.size());
+
+		// Tracking output
+		std::cout << "Transformed image: " + image_path << std::endl;
 
 		return transformed_image;
 	}
 
 	cv::Mat detect_lanes(cv::Mat &image, std::string &image_path) {
-		cv::Mat detected_lanes = image;
+		// Prepare output
+		cv::Mat detected_lanes;
 
-		return detected_lanes;
+		// Fine all nonzero pixels
+		cv::Mat nonzero;
+		cv::findNonZero(image, nonzero);
+
+		// Create a histogram
+		int bins = 1;
+		int histSize[] = { 1 };
+		// Set ranges for histogram bins
+		float lranges[] = { 0, 1 };
+		const float* ranges[] = { lranges };
+		// create matrix for histogram
+		cv::Mat hist;
+		int channels[] = { 0 };
+
+		cv::calcHist(&image, 1, channels, cv::Mat(), hist, 1, histSize, ranges);
+
+
+		return hist;
 	}
 
 public:
@@ -196,7 +219,7 @@ public:
 
 	cv::Mat find_lanes(cv::Mat &image, std::string &image_path) {
 
-		// Copy image
+		// Output image
 		cv::Mat resultant_image;
 
 		// Undistort image
