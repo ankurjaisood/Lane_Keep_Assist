@@ -114,39 +114,39 @@ private:
 		cv::Mat* thresholded_image = new cv::Mat();;
 
 		// Convert to HLS colour space
-		cv::Mat hls_image;
-		cv::cvtColor(image, hls_image, cv::COLOR_RGB2HLS);
+		cv::Mat* hls_image = new cv::Mat();
+		cv::cvtColor(image, *hls_image, cv::COLOR_RGB2HLS);
 
 		// Convert to grayscale
-		cv::Mat gray_image;
-		cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+		cv::Mat *gray_image = new cv::Mat();;
+		cv::cvtColor(image, *gray_image, cv::COLOR_BGR2GRAY);
 
 		// Sobel x, y
 		int kernel_size = 9;
-		cv::Mat sobelx;
-		cv::Sobel(gray_image, sobelx, CV_64F, 1, 0, kernel_size);
+		cv::Mat* sobelx = new cv::Mat();;
+		cv::Sobel(*gray_image, *sobelx, CV_64F, 1, 0, kernel_size);
 
 		// Scale sobel
-		cv::Mat scaled_sobelx;
+		cv::Mat* scaled_sobelx = new cv::Mat();;
 		double minVal, maxVal;
-		cv::minMaxLoc(sobelx, &minVal, &maxVal);
-		sobelx.convertTo(scaled_sobelx, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
+		cv::minMaxLoc(*sobelx, &minVal, &maxVal);
+		(*sobelx).convertTo(*scaled_sobelx, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
 
 		// Apply threshold on sobelx
-		cv::Mat thresholded_sobelx;
-		cv::inRange(scaled_sobelx, GRADIENT_THRES_MIN, GRADIENT_THRES_MAX, thresholded_sobelx);
+		cv::Mat* thresholded_sobelx = new cv::Mat();;
+		cv::inRange(*scaled_sobelx, GRADIENT_THRES_MIN, GRADIENT_THRES_MAX, *thresholded_sobelx);
 
 		// Extract S channel from HLS image
-		cv::Mat channels[3];
-		cv::split(hls_image, channels);
-		cv::Mat s_channel = channels[2];
+		cv::Mat* channels = new cv::Mat[3];
+		cv::split(*hls_image, channels);
+		cv::Mat* s_channel = &channels[2];
 
 		// Apply threshold on s channel
-		cv::Mat thresholded_schannel;
-		cv::inRange(s_channel, COLOUR_THRES_MIN, COLOUR_THRES_MAX, thresholded_schannel);
+		cv::Mat* thresholded_schannel = new cv::Mat();;
+		cv::inRange(*s_channel, COLOUR_THRES_MIN, COLOUR_THRES_MAX, *thresholded_schannel);
 
 		// Combine both channels
-		cv::bitwise_or(thresholded_sobelx, thresholded_schannel, *thresholded_image);
+		cv::bitwise_or(*thresholded_sobelx, *thresholded_schannel, *thresholded_image);
 
 		// Tracking output
 		//std::cout << "Scaled and Thresholded image: " + image_path << std::endl;
@@ -199,8 +199,8 @@ private:
 		cv::Mat* detected_lanes = new cv::Mat();;
 
 		// Fine all nonzero pixels
-		std::vector<cv::Point> nonzero;
-		cv::findNonZero(image, nonzero);
+		std::vector<cv::Point>* nonzero = new std::vector<cv::Point>;
+		cv::findNonZero(image, *nonzero);
 
 		// Get the bottom half of the image
 		cv::Mat bot_half = image(cv::Rect(0, image.rows / 2, image.cols, image.rows / 2));
@@ -210,25 +210,25 @@ private:
 		cv::Mat right_half = bot_half(cv::Rect(bot_half.cols / 2, 0, bot_half.cols / 2, bot_half.rows));
 
 		// Get "histogram" of each side
-		cv::Mat left_hist;
-		cv::Mat right_hist;
-		cv::reduce(left_half, left_hist, 0, cv::REDUCE_SUM, CV_32F);
-		cv::reduce(right_half, right_hist, 0, cv::REDUCE_SUM, CV_32F);
+		cv::Mat* left_hist = new cv::Mat();
+		cv::Mat* right_hist = new cv::Mat();;
+		cv::reduce(left_half, *left_hist, 0, cv::REDUCE_SUM, CV_32F);
+		cv::reduce(right_half, *right_hist, 0, cv::REDUCE_SUM, CV_32F);
 		
 		// Extract max values from histogram halves
 		cv::Point left_base;
 		cv::Point right_base;
 
-		cv::minMaxLoc(left_hist, 0, 0, 0, &left_base);
-		cv::minMaxLoc(right_hist, 0, 0, 0, &right_base);
+		cv::minMaxLoc(*left_hist, 0, 0, 0, &left_base);
+		cv::minMaxLoc(*right_hist, 0, 0, 0, &right_base);
 
 		// Sliding window for each side of image
 		cv::Point left_current = left_base;
 		cv::Point right_current = right_base;
 
 		// Sliding window and polynomial fit
-		std::vector<double> left_fit = left_lane.find_lane(image, nonzero, left_current);
-		std::vector<double> right_fit = right_lane.find_lane(image, nonzero, right_current);
+		std::vector<double> left_fit = left_lane.find_lane(image, *nonzero, left_current);
+		std::vector<double> right_fit = right_lane.find_lane(image, *nonzero, right_current);
 
 		// Create points for fillpoly
 		std::vector<cv::Point> l_points;

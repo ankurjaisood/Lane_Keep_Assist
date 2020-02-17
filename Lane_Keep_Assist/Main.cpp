@@ -29,11 +29,11 @@ void test_sample_images() {
 
         // Undistort the image
         cv::setUseOptimized(true);
-        auto start = std::chrono::high_resolution_clock::now();
+        auto start = cv::getTickCount() / cv::getTickFrequency();
         cv::Mat* resultant_image = detector.find_lanes(image, image_string);
-        auto stop = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-        std::cout << duration.count() << std::endl;
+        auto stop = cv::getTickCount() / cv::getTickFrequency();
+        auto duration = (stop - start);
+        std::cout << duration << std::endl;
 
         // Get filename
         fs::path pathObj(image_path);
