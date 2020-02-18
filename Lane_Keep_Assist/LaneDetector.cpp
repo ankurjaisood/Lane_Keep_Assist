@@ -99,64 +99,72 @@ private:
 		calibrated = true;
 	}
 
-	cv::Mat* undistort_image(cv::Mat &image, std::string &image_path) {
-		cv::Mat* undistorted_image = new cv::Mat();;
+	int undistort_image(cv::Mat* image, cv::Mat* resultant_image, std::string &image_path) {
+
+		if (image == nullptr || resultant_image == nullptr) return 0;
+
 		if (calibrated) {
-			cv::undistort(image, *undistorted_image, calibration_matrix, distance_coefficients);
+			cv::undistort(*image, *resultant_image, calibration_matrix, distance_coefficients);
+			
 			// Tracking output
 			//std::cout << "Undistoted image: " + image_path << std::endl;
+
+			// Successful
+			return 1;
 		}
-		return undistorted_image;
+		// Unsuccessful
+		return 0;
 	}
 
-	cv::Mat* threshold_image(cv::Mat &image, std::string &image_path) {
-		// Create an output image
-		cv::Mat* thresholded_image = new cv::Mat();;
+	int threshold_image(cv::Mat* image, cv::Mat* thresholded_image, std::string &image_path) {
+
+		if (image == nullptr || thresholded_image == nullptr) return 0;
 
 		// Convert to HLS colour space
-		cv::Mat* hls_image = new cv::Mat();
-		cv::cvtColor(image, *hls_image, cv::COLOR_RGB2HLS);
+		cv::Mat hls_image;
+		cv::cvtColor(*image, hls_image, cv::COLOR_RGB2HLS);
 
 		// Convert to grayscale
-		cv::Mat *gray_image = new cv::Mat();;
-		cv::cvtColor(image, *gray_image, cv::COLOR_BGR2GRAY);
+		cv::Mat gray_image;
+		cv::cvtColor(*image, gray_image, cv::COLOR_BGR2GRAY);
 
 		// Sobel x, y
 		int kernel_size = 9;
-		cv::Mat* sobelx = new cv::Mat();;
-		cv::Sobel(*gray_image, *sobelx, CV_64F, 1, 0, kernel_size);
+		cv::Mat sobelx;
+		cv::Sobel(gray_image, sobelx, CV_64F, 1, 0, kernel_size);
 
 		// Scale sobel
-		cv::Mat* scaled_sobelx = new cv::Mat();;
+		cv::Mat scaled_sobelx;
 		double minVal, maxVal;
-		cv::minMaxLoc(*sobelx, &minVal, &maxVal);
-		(*sobelx).convertTo(*scaled_sobelx, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
+		cv::minMaxLoc(sobelx, &minVal, &maxVal);
+		sobelx.convertTo(scaled_sobelx, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
 
 		// Apply threshold on sobelx
-		cv::Mat* thresholded_sobelx = new cv::Mat();;
-		cv::inRange(*scaled_sobelx, GRADIENT_THRES_MIN, GRADIENT_THRES_MAX, *thresholded_sobelx);
+		cv::Mat thresholded_sobelx;
+		cv::inRange(scaled_sobelx, GRADIENT_THRES_MIN, GRADIENT_THRES_MAX, thresholded_sobelx);
 
 		// Extract S channel from HLS image
-		cv::Mat* channels = new cv::Mat[3];
-		cv::split(*hls_image, channels);
-		cv::Mat* s_channel = &channels[2];
+		cv::Mat channels[3];
+		cv::split(hls_image, channels);
+		cv::Mat s_channel = channels[2];
 
 		// Apply threshold on s channel
-		cv::Mat* thresholded_schannel = new cv::Mat();;
-		cv::inRange(*s_channel, COLOUR_THRES_MIN, COLOUR_THRES_MAX, *thresholded_schannel);
+		cv::Mat thresholded_schannel;
+		cv::inRange(s_channel, COLOUR_THRES_MIN, COLOUR_THRES_MAX, thresholded_schannel);
 
 		// Combine both channels
-		cv::bitwise_or(*thresholded_sobelx, *thresholded_schannel, *thresholded_image);
+		cv::bitwise_or(thresholded_sobelx, thresholded_schannel, *thresholded_image);
 
 		// Tracking output
 		//std::cout << "Scaled and Thresholded image: " + image_path << std::endl;
 
-		return thresholded_image;
+		return 1;
 	}
 
-	void get_perspective_transform(cv::Mat& image, std::string& image_path) {
+	void get_perspective_transform(cv::Mat* image, std::string& image_path) {
+
 		// Set source and destination points
-		cv::Size img_size = image.size();
+		cv::Size img_size = (*image).size();
 
 		// get dst points
 		cv::Point2f dst_points[4] = { cv::Point2f(OFFSET, img_size.height - OFFSET), cv::Point2f(OFFSET, OFFSET),
@@ -172,71 +180,75 @@ private:
 		//std::cout << "Calculated perspective transform using: " + image_path << std::endl;
 	}
 
-	cv::Mat* perspective_transform(cv::Mat &image, std::string &image_path) {
+	int perspective_transform(cv::Mat* image, cv::Mat* transformed_image, std::string &image_path) {
+
+		if (image == nullptr || transformed_image == nullptr) return 0;
+
 		// Transform the image using the calculated matrix
-		cv::Mat* transformed_image = new cv::Mat();;
-		cv::warpPerspective(image, *transformed_image, transform_matrix, image.size());
+		cv::warpPerspective(*image, *transformed_image, transform_matrix, (*image).size());
 
 		// Tracking output
 		//std::cout << "Transformed image: " + image_path << std::endl;
 
-		return transformed_image;
+		return 1;
 	}
 
-	cv::Mat* inv_perspective_transform(cv::Mat& image, std::string& image_path) {
+	int inv_perspective_transform(cv::Mat* image, cv::Mat* result_image, std::string& image_path) {
+
+		if (image == nullptr || result_image == nullptr) return 0;
+
 		// Transform the image using the calculated matrix
-		cv::Mat* inv_transformed_image = new cv::Mat();
-		cv::warpPerspective(image, *inv_transformed_image, inv_transform_matrix, image.size());
+		cv::warpPerspective(*image, *result_image, inv_transform_matrix, (*image).size());
 
 		// Tracking output
 		//std::cout << "Inverse Transformed image: " + image_path << std::endl;
 
-		return inv_transformed_image;
+		return 1;
 	}
 
-	cv::Mat* detect_lanes(cv::Mat &original_image, cv::Mat &image, std::string &image_path) {
-		// Prepare output
-		cv::Mat* detected_lanes = new cv::Mat();;
+	int detect_lanes(cv::Mat* original_image, cv::Mat* image, std::string &image_path) {
+
+		if (original_image == nullptr || image == nullptr) return 0;
 
 		// Fine all nonzero pixels
-		std::vector<cv::Point>* nonzero = new std::vector<cv::Point>;
-		cv::findNonZero(image, *nonzero);
+		std::vector<cv::Point> nonzero;
+		cv::findNonZero(*image, nonzero);
 
 		// Get the bottom half of the image
-		cv::Mat bot_half = image(cv::Rect(0, image.rows / 2, image.cols, image.rows / 2));
+		cv::Mat bot_half = (*image)(cv::Rect(0, (*image).rows / 2, (*image).cols, (*image).rows / 2));
 
 		// Get left and right halves of bottom half of image
 		cv::Mat left_half = bot_half(cv::Rect(0, 0, bot_half.cols / 2, bot_half.rows));
 		cv::Mat right_half = bot_half(cv::Rect(bot_half.cols / 2, 0, bot_half.cols / 2, bot_half.rows));
 
 		// Get "histogram" of each side
-		cv::Mat* left_hist = new cv::Mat();
-		cv::Mat* right_hist = new cv::Mat();;
-		cv::reduce(left_half, *left_hist, 0, cv::REDUCE_SUM, CV_32F);
-		cv::reduce(right_half, *right_hist, 0, cv::REDUCE_SUM, CV_32F);
+		cv::Mat left_hist;
+		cv::Mat right_hist;
+		cv::reduce(left_half, left_hist, 0, cv::REDUCE_SUM, CV_32F);
+		cv::reduce(right_half, right_hist, 0, cv::REDUCE_SUM, CV_32F);
 		
 		// Extract max values from histogram halves
 		cv::Point left_base;
 		cv::Point right_base;
 
-		cv::minMaxLoc(*left_hist, 0, 0, 0, &left_base);
-		cv::minMaxLoc(*right_hist, 0, 0, 0, &right_base);
+		cv::minMaxLoc(left_hist, 0, 0, 0, &left_base);
+		cv::minMaxLoc(right_hist, 0, 0, 0, &right_base);
 
 		// Sliding window for each side of image
 		cv::Point left_current = left_base;
 		cv::Point right_current = right_base;
 
 		// Sliding window and polynomial fit
-		std::vector<double> left_fit = left_lane.find_lane(image, *nonzero, left_current);
-		std::vector<double> right_fit = right_lane.find_lane(image, *nonzero, right_current);
+		std::vector<double> left_fit = left_lane.find_lane(*image, nonzero, left_current);
+		std::vector<double> right_fit = right_lane.find_lane(*image, nonzero, right_current);
 
 		// Create points for fillpoly
 		std::vector<cv::Point> l_points;
 		std::vector<cv::Point> r_points;
 
-		for (int i = 0; i < image.size().height; ++i) {
-			int left_x = int(left_fit[0] + left_fit[1] * i + pow(left_fit[2] * i, 2));
-			int right_x = int(right_fit[0] + right_fit[1] * i + pow(right_fit[2] * i, 2));
+		for (int i = 0; i < (*image).size().height; ++i) {
+			int left_x = int(left_fit[2] + left_fit[1] * i + pow(left_fit[0] * i, 2));
+			int right_x = int(right_fit[2] + right_fit[1] * i + pow(right_fit[0] * i, 2));
 			l_points.push_back(cv::Point(left_x, i));
 			r_points.push_back(cv::Point(right_x, i));
 		}
@@ -244,11 +256,11 @@ private:
 		std::vector<std::vector<cv::Point>> points = { l_points };
 
 		// Draw lanes on image
-		cv::fillPoly(original_image, points, cv::Scalar(255, 255, 255));
+		cv::fillPoly(*image, points, cv::Scalar(255, 255, 255));
 
 		//std::cout << "Detected Lanes: " + image_path << std::endl;
 
-		return &original_image;
+		return 1;
 	}
 
 public:
@@ -265,31 +277,47 @@ public:
 		calibrate_camera(camera_calibration_images, chessboard_size, debug);
 	}
 
-	cv::Mat* find_lanes(cv::Mat &image, std::string &image_path) {
+	int find_lanes(cv::Mat* image, cv::Mat* resultant_image, std::string &image_path) {
 
-		// Output image
-		cv::Mat* resultant_image;
+		if (image == nullptr || resultant_image == nullptr) return 0;
 
 		// Undistort image
-		cv::Mat* undistorted_image = undistort_image(image, image_path);
+		cv::Mat undistorted_image;
+		int undistort_status = undistort_image(image, &undistorted_image, image_path);
 
-		if (!transform_calculated) {
+		if (!transform_calculated && undistort_status == 1) {
 			// Calculate perspective transform
-			get_perspective_transform(image, image_path);
+			get_perspective_transform(&undistorted_image, image_path);
 		}
 
 		// Colour and gradient threshold
-		cv::Mat* thresholded_image = threshold_image(*undistorted_image, image_path);
+		int threshold_status = 0;
+		cv::Mat thresholded_image;
+		if (transform_calculated && undistort_status == 1) {
+			threshold_status = threshold_image(&undistorted_image, &thresholded_image, image_path);
+		}
 
 		// Get perspective transform
-		cv::Mat* transformed_image = perspective_transform(*thresholded_image, image_path);
+		int perspective_status = 0;
+		cv::Mat transformed_image;
+		if (transform_calculated && undistort_status == 1 && threshold_status == 1) {
+			perspective_status = perspective_transform(&thresholded_image, &transformed_image, image_path);
+		}
 
 		// Find lanes
-		cv::Mat* lane_image = detect_lanes(image, *transformed_image, image_path);
+		int lane_status;
+		if (transform_calculated && undistort_status == 1 && threshold_status == 1 && perspective_status == 1) {
+			lane_status = detect_lanes(&undistorted_image, &transformed_image, image_path);
+		}
 
 		// Inverse perspective transform
-		resultant_image = inv_perspective_transform(*lane_image, image_path);
+		if (transform_calculated && undistort_status == 1 && threshold_status == 1 && perspective_status == 1) {
+			int complete = inv_perspective_transform(&transformed_image, resultant_image, image_path);
+			if (complete == 1) {
+				return 1;
+			}
+		}
 
-		return resultant_image;
+		return 0;
 	}
 };

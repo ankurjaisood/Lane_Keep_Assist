@@ -30,7 +30,8 @@ void test_sample_images() {
         // Undistort the image
         cv::setUseOptimized(true);
         auto start = cv::getTickCount() / cv::getTickFrequency();
-        cv::Mat* resultant_image = detector.find_lanes(image, image_string);
+        cv::Mat resultant_image;
+        int status = detector.find_lanes(&image, &resultant_image, image_string);
         auto stop = cv::getTickCount() / cv::getTickFrequency();
         auto duration = (stop - start);
         std::cout << duration << std::endl;
@@ -41,7 +42,9 @@ void test_sample_images() {
         std::string output_path = TEST_IMAGES_OUTPUT_DIRECTORY + file_name;
         
         // Write the resultant image
-        cv::imwrite(output_path, *resultant_image);
+        if (status == 1) {
+            cv::imwrite(output_path, resultant_image);
+        }
 
         // Display image
         //cv::imshow(image_string, resultant_image);
