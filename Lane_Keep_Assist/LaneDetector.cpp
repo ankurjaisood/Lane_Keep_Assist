@@ -157,7 +157,6 @@ private:
 
 		// Tracking output
 		//std::cout << "Scaled and Thresholded image: " + image_path << std::endl;
-
 		return 1;
 	}
 
@@ -206,9 +205,9 @@ private:
 		return 1;
 	}
 
-	int detect_lanes(cv::Mat* original_image, cv::Mat* image, std::string &image_path) {
+	int detect_lanes(cv::Mat* image, cv::Mat* resultant_image, std::string &image_path) {
 
-		if (original_image == nullptr || image == nullptr) return 0;
+		if (image == nullptr) return 0;
 
 		// Fine all nonzero pixels
 		std::vector<cv::Point> nonzero;
@@ -237,6 +236,7 @@ private:
 		// Sliding window for each side of image
 		cv::Point left_current = left_base;
 		cv::Point right_current = right_base;
+		right_current.x += (*image).size().width / 2;
 
 		// Sliding window and polynomial fit
 		std::vector<double> left_fit = left_lane.find_lane(*image, nonzero, left_current);
@@ -247,8 +247,8 @@ private:
 		std::vector<cv::Point> r_points;
 
 		for (int i = 0; i < (*image).size().height; ++i) {
-			int left_x = int(left_fit[2] + left_fit[1] * i + pow(left_fit[0] * i, 2));
-			int right_x = int(right_fit[2] + right_fit[1] * i + pow(right_fit[0] * i, 2));
+			int left_x = int(left_fit[0] + left_fit[1] * i + pow(left_fit[2] * i, 2));
+			int right_x = int(right_fit[0] + right_fit[1] * i + pow(right_fit[2] * i, 2));
 			l_points.push_back(cv::Point(left_x, i));
 			r_points.push_back(cv::Point(right_x, i));
 		}
@@ -256,7 +256,7 @@ private:
 		std::vector<std::vector<cv::Point>> points = { l_points };
 
 		// Draw lanes on image
-		cv::fillPoly(*image, points, cv::Scalar(255, 255, 255));
+		//cv::fillPoly(*resultant_image, points, cv::Scalar(255, 255, 255));
 
 		//std::cout << "Detected Lanes: " + image_path << std::endl;
 
@@ -303,13 +303,14 @@ public:
 		if (transform_calculated && undistort_status == 1 && threshold_status == 1) {
 			perspective_status = perspective_transform(&thresholded_image, &transformed_image, image_path);
 		}
-
+		
 		// Find lanes
 		int lane_status;
 		if (transform_calculated && undistort_status == 1 && threshold_status == 1 && perspective_status == 1) {
-			lane_status = detect_lanes(&undistorted_image, &transformed_image, image_path);
+			lane_status = detect_lanes(&transformed_image, &transformed_image, image_path);
 		}
 
+		
 		// Inverse perspective transform
 		if (transform_calculated && undistort_status == 1 && threshold_status == 1 && perspective_status == 1) {
 			int complete = inv_perspective_transform(&transformed_image, resultant_image, image_path);

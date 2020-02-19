@@ -26,7 +26,7 @@ private:
 			int win_x_high = x_current + WINDOW_MARGIN;
 
 			// Draw the rectangle on the output image
-			//cv::rectangle(image, cv::Point(win_x_low, win_y_low), cv::Point(win_x_high, win_y_high), cv::Scalar(255, 255, 255), 2);
+			cv::rectangle(image, cv::Point(win_x_low, win_y_low), cv::Point(win_x_high, win_y_high), cv::Scalar(255, 255, 255), 2);
 
 			// Get all nonzero pixels within the window
 			int x_sum = 0;
@@ -37,11 +37,12 @@ private:
 				}
 			}
 
+			poly_points.insert(poly_points.end(), line_points.begin(), line_points.end());
+
 			// If there were enough white pixels in the window re-center
 			if (line_points.size() >= MIN_NUMBER_PIXELS) {
 				int x_mean = x_sum / line_points.size();
 				x_current = x_mean;
-				poly_points.insert(poly_points.end(), line_points.begin(), line_points.end());
 			}
 		}
 		return poly_points;
@@ -129,12 +130,9 @@ private:
 			a[i] = a[i] / B[i][i];            
 			//now finally divide the rhs by the coefficient of the variable to be calculated
 		}
-
+        
 		/*
-		std::cout << "\nThe values of the coefficients are as follows:\n";
-		for (i = 0; i < degree; i++)
-			std::cout << "x^" << i << "=" << a[i] << std::endl;           
-		std::cout << "\nHence the fitted Polynomial is given by:\ny=";
+		std::cout << "\n The fitted Polynomial is given by:\ny=";
 		for (i = 0; i < degree; i++)
 			std::cout << " + (" << a[i] << ")" << "x^" << i;
 		std::cout << "\n";
