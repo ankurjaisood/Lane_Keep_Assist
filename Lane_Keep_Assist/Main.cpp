@@ -13,6 +13,9 @@ cv::Size CHESSBOARD_SIZE = cv::Size(9, 6);
 // NAMESPACE VARIABLES
 namespace fs = std::filesystem;
 
+// CUDA
+extern "C" void run_tests();
+
 // TEST FUNCTIONS
 void test_sample_images() {
     // Create a LaneDetector object
@@ -30,7 +33,7 @@ void test_sample_images() {
         // Undistort the image
         cv::setUseOptimized(true);
         auto start = cv::getTickCount() / cv::getTickFrequency();
-        cv::Mat resultant_image;
+        cv::Mat resultant_image(image.size().height, image.size().width, CV_8U, 0.0);
         int status = detector.find_lanes(&image, &resultant_image, image_string);
         auto stop = cv::getTickCount() / cv::getTickFrequency();
         auto duration = (stop - start);
@@ -51,6 +54,8 @@ void test_sample_images() {
         //cv::waitKey();
     }
 
+    // Run CUDA test
+    run_tests();
 }
 
 // START OF MAIN PROGRAM 

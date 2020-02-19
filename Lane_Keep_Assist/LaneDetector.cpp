@@ -39,6 +39,7 @@ private:
 		// Populate object points
 		int numSquares = chessboard_size.width * chessboard_size.height;
 		std::vector<cv::Point3f> obj;
+		obj.reserve(numSquares);
 		for (int j = 0; j < numSquares; j++)
 			obj.push_back(cv::Point3f(j / chessboard_size.width, j % chessboard_size.width, 0.0f));
 
@@ -53,7 +54,7 @@ private:
 
 			// Read the image matrix
 			cv::Mat image = cv::imread(image_string);
-			cv::Mat gray_image = image;
+			cv::Mat gray_image(image.size().height, image.size().width, CV_8U, 0.0);
 			cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
 
 			// Get the size of the image
@@ -63,6 +64,7 @@ private:
 
 			// Find the chessboard corners
 			std::vector<cv::Point2f> corners;
+			corners.reserve(numSquares);
 			bool corners_found = cv::findChessboardCorners(gray_image, chessboard_size, corners);
 
 			if (corners_found) {
@@ -120,27 +122,32 @@ private:
 
 		if (image == nullptr || thresholded_image == nullptr) return 0;
 
+		int height = (*image).size().height;
+		int width = (*image).size().width;
+		int rows = (*image).rows;
+		int cols = (*image).cols;
+
 		// Convert to HLS colour space
-		cv::Mat hls_image;
+		cv::Mat hls_image(height, width, CV_8U, 0.0);
 		cv::cvtColor(*image, hls_image, cv::COLOR_RGB2HLS);
 
 		// Convert to grayscale
-		cv::Mat gray_image;
+		cv::Mat gray_image(height, width, CV_8U, 0.0);
 		cv::cvtColor(*image, gray_image, cv::COLOR_BGR2GRAY);
 
 		// Sobel x, y
 		int kernel_size = 9;
-		cv::Mat sobelx;
+		cv::Mat sobelx(height, width, CV_64F, 0.0);
 		cv::Sobel(gray_image, sobelx, CV_64F, 1, 0, kernel_size);
 
 		// Scale sobel
-		cv::Mat scaled_sobelx;
+		cv::Mat scaled_sobelx(height, width, CV_8U, 0.0);
 		double minVal, maxVal;
 		cv::minMaxLoc(sobelx, &minVal, &maxVal);
 		sobelx.convertTo(scaled_sobelx, CV_8U, 255.0 / (maxVal - minVal), -minVal * 255.0 / (maxVal - minVal));
 
 		// Apply threshold on sobelx
-		cv::Mat thresholded_sobelx;
+		cv::Mat thresholded_sobelx((*image).size().height, (*image).size().width, CV_8U, 0.0);
 		cv::inRange(scaled_sobelx, GRADIENT_THRES_MIN, GRADIENT_THRES_MAX, thresholded_sobelx);
 
 		// Extract S channel from HLS image
@@ -149,7 +156,7 @@ private:
 		cv::Mat s_channel = channels[2];
 
 		// Apply threshold on s channel
-		cv::Mat thresholded_schannel;
+		cv::Mat thresholded_schannel((*image).size().height, (*image).size().width, CV_8U, 0.0);
 		cv::inRange(s_channel, COLOUR_THRES_MIN, COLOUR_THRES_MAX, thresholded_schannel);
 
 		// Combine both channels
@@ -209,20 +216,26 @@ private:
 
 		if (image == nullptr) return 0;
 
+		int height = (*image).size().height;
+		int width = (*image).size().width;
+		int rows = (*image).rows;
+		int cols = (*image).cols;
+
 		// Fine all nonzero pixels
 		std::vector<cv::Point> nonzero;
 		cv::findNonZero(*image, nonzero);
 
 		// Get the bottom half of the image
-		cv::Mat bot_half = (*image)(cv::Rect(0, (*image).rows / 2, (*image).cols, (*image).rows / 2));
+		cv::Mat bot_half = (*image)(cv::Rect(0, rows / 2, cols, rows / 2));
 
 		// Get left and right halves of bottom half of image
 		cv::Mat left_half = bot_half(cv::Rect(0, 0, bot_half.cols / 2, bot_half.rows));
 		cv::Mat right_half = bot_half(cv::Rect(bot_half.cols / 2, 0, bot_half.cols / 2, bot_half.rows));
 
 		// Get "histogram" of each side
-		cv::Mat left_hist;
-		cv::Mat right_hist;
+		cv::Mat left_hist(1, width/2, CV_32F, 0.0);
+		cv::Mat right_hist(1, width / 2, CV_32F, 0.0);
+
 		cv::reduce(left_half, left_hist, 0, cv::REDUCE_SUM, CV_32F);
 		cv::reduce(right_half, right_hist, 0, cv::REDUCE_SUM, CV_32F);
 		
@@ -236,7 +249,7 @@ private:
 		// Sliding window for each side of image
 		cv::Point left_current = left_base;
 		cv::Point right_current = right_base;
-		right_current.x += (*image).size().width / 2;
+		right_current.x += width / 2;
 
 		// Sliding window and polynomial fit
 		std::vector<double> left_fit = left_lane.find_lane(*image, nonzero, left_current);
@@ -281,8 +294,11 @@ public:
 
 		if (image == nullptr || resultant_image == nullptr) return 0;
 
+		int height = (*image).size().height;
+		int width = (*image).size().width;
+
 		// Undistort image
-		cv::Mat undistorted_image;
+		cv::Mat undistorted_image(height, width, CV_8U, 0.0);
 		int undistort_status = undistort_image(image, &undistorted_image, image_path);
 
 		if (!transform_calculated && undistort_status == 1) {
@@ -292,14 +308,14 @@ public:
 
 		// Colour and gradient threshold
 		int threshold_status = 0;
-		cv::Mat thresholded_image;
+		cv::Mat thresholded_image(height, width, CV_8U, 0.0);
 		if (transform_calculated && undistort_status == 1) {
 			threshold_status = threshold_image(&undistorted_image, &thresholded_image, image_path);
 		}
 
 		// Get perspective transform
 		int perspective_status = 0;
-		cv::Mat transformed_image;
+		cv::Mat transformed_image(height, width, CV_8U, 0.0);
 		if (transform_calculated && undistort_status == 1 && threshold_status == 1) {
 			perspective_status = perspective_transform(&thresholded_image, &transformed_image, image_path);
 		}
@@ -310,7 +326,6 @@ public:
 			lane_status = detect_lanes(&transformed_image, &transformed_image, image_path);
 		}
 
-		
 		// Inverse perspective transform
 		if (transform_calculated && undistort_status == 1 && threshold_status == 1 && perspective_status == 1) {
 			int complete = inv_perspective_transform(&transformed_image, resultant_image, image_path);
