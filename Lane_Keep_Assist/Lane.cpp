@@ -155,3 +155,23 @@ public:
 		return coefficients;
 	};
 };
+
+float PID_controller(const std::vector<float> &errors, const float &Kp, const float &Kd, const float &Ki, const float &dT) {
+	if (errors.size() < 2) return 0;
+
+	// There is enough data points in errors
+	float curr_error = *(errors.rbegin());
+	float prev_error = *(errors.rbegin() - 1);
+
+	// Find accumulated error
+	float err_sum = 0;
+
+	for (auto err : errors) {
+		err_sum += err;
+	}
+
+	// calculate control gain
+	float gain = Kp * curr_error + Kd * (curr_error - prev_error) * dT + Ki * (err_sum * dT);
+
+	return gain;
+}
